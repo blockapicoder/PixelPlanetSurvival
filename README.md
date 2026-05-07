@@ -1,6 +1,6 @@
-# Sphere Shoot
+# PixelPlanetSurvival
 
-Projet TypeScript + Vite + Express repris depuis `C:\tmp\sphere_navigation.html`.
+Jeu de survie pixel art sur une planete, construit en TypeScript avec Vite et Express.
 
 ## Scripts
 

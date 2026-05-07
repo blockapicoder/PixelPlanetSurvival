@@ -1,4 +1,4 @@
-Creer une application web de jeu appelee "Sphere Shoot" dans un projet TypeScript avec Vite pour le client et Express pour le serveur Node.js.
+Creer une application web de jeu appelee "PixelPlanetSurvival" dans un projet TypeScript avec Vite pour le client et Express pour le serveur Node.js.
 
 Objectif general:
 Construire un jeu 2D en canvas, en pixel art, ou le joueur pilote un vaisseau qui navigue sur la projection d'une sphere. Le jeu doit etre plein ecran, sans interface HTML laterale, avec tous les elements visuels rendus dans le canvas.
