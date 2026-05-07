@@ -1,0 +1,138 @@
+Creer une application web de jeu appelee "Sphere Shoot" dans un projet TypeScript avec Vite pour le client et Express pour le serveur Node.js.
+
+Objectif general:
+Construire un jeu 2D en canvas, en pixel art, ou le joueur pilote un vaisseau qui navigue sur la projection d'une sphere. Le jeu doit etre plein ecran, sans interface HTML laterale, avec tous les elements visuels rendus dans le canvas.
+
+Stack technique:
+- TypeScript strict.
+- Vite pour le frontend.
+- Express en Node.js pour servir l'application et exposer une route `/api/health`.
+- Fichiers principaux:
+  - `src/main.ts` pour le jeu.
+  - `src/styles.css` pour le plein ecran.
+  - `src/gameConfig.ts` pour tous les parametres modifiables du jeu.
+
+Contraintes de configuration:
+Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts`, notamment:
+- ressources initiales du joueur: vie, energie, or.
+- intervalle periodique de perte de vie.
+- capacites initiales de transport pour vie, energie et or.
+- taille de la sphere.
+- zoom, vitesse, pas de deplacement, vitesse de rotation.
+- nombre de ressources sur la sphere.
+- distance minimale entre ressources.
+- distance de collecte.
+- nombre de magasins.
+- distance d'ouverture des magasins.
+- nombre de points de sauvegarde.
+- distance d'activation des points de sauvegarde.
+- cout en energie pour confirmer une sauvegarde.
+- nombre d'ennemis.
+- distances d'agression et de collision des ennemis.
+- vitesse des ennemis.
+- vitesse, portee et cout energetique des tirs.
+- parametres souris.
+- portee du radar `distRadar` et nombre maximal d'indicateurs radar.
+- marge de vision de la sphere pour laisser de la place aux indicateurs radar autour de la bordure.
+- couts et gains des ameliorations de capacite en magasin.
+- couts et gains des ameliorations de portee radar en magasin.
+
+Gameplay:
+- Le joueur est un vaisseau en pixel art fixe au centre de l'ecran.
+- La sphere tourne/navigue sous le vaisseau.
+- Les fleches clavier permettent de se deplacer et tourner.
+- Clic droit sur la sphere: le vaisseau tourne progressivement vers le point clique, puis avance vers ce point.
+- Clic gauche sur la sphere: le vaisseau tourne progressivement vers le point clique, puis tire dans cette direction.
+- Espace tire droit devant.
+- Un tir consomme de l'energie.
+- Les tirs se deplacent sur la surface de la sphere et detruisent les ennemis touches.
+- Si l'energie est insuffisante, le tir ne part pas.
+
+Ressources:
+- Generer des ressources sur la sphere avec une contrainte: toutes les ressources doivent etre separees par une distance superieure a une distance minimale configurable.
+- Types de ressources:
+  - coeur: vie.
+  - eclair: energie.
+  - or: argent.
+  - magasin: ouvre une boutique.
+  - sauvegarde: balise/checkpoint en pixel art qui definit le point de retour du joueur.
+- Chaque ressource doit etre dessinee en pixel art dans le canvas.
+- Les ressources collecteables disparaissent quand elles sont ramassees.
+- Le joueur ne peut pas ramasser une ressource si la capacite correspondante est pleine.
+- Les coeurs augmentent la vie jusqu'a la capacite de vie.
+- Quand le joueur ramasse un coeur, le compteur de perte de vie periodique revient a son maximum.
+- Les eclairs augmentent l'energie jusqu'a la capacite d'energie.
+- L'or augmente l'argent jusqu'a la capacite d'or.
+- Quand le joueur passe sur une sauvegarde, afficher une popup pixel art demandant s'il veut sauvegarder.
+- La sauvegarde est payante et consomme de l'energie.
+- La popup de sauvegarde doit afficher le cout en energie.
+- Si le joueur confirme la popup et a assez d'energie, consommer l'energie, puis cette position devient le point de retour du joueur et l'etat acquis a ce moment est memorise: ressources, capacites et ameliorations.
+- Si le joueur n'a pas assez d'energie, afficher un message indiquant qu'il n'a pas assez d'energie pour sauvegarder et garder la popup ouverte.
+- Si le joueur refuse, ne pas sauvegarder et ne pas rouvrir la popup tant que le joueur n'est pas sorti de la zone.
+
+Magasins:
+- Ajouter des magasins comme type de ressource special en pixel art.
+- Quand le joueur arrive sur un magasin, ouvrir une interface boutique en pixel art dans le canvas.
+- Pendant que la boutique est ouverte, mettre le jeu en pause.
+- La boutique doit permettre d'acheter:
+  - augmentation de capacite de vie.
+  - augmentation de capacite d'energie.
+  - augmentation de capacite d'or.
+  - augmentation de portee du radar `distRadar`.
+- Les achats coutent de l'or.
+- Les couts et les gains de capacite doivent etre configurables dans `src/gameConfig.ts`.
+- La boutique doit pouvoir etre fermee avec un bouton dans l'interface ou avec `Escape`.
+- Apres fermeture, le magasin ne doit pas se rouvrir en boucle tant que le joueur n'est pas sorti de sa zone.
+
+Ennemis:
+- Generer des ennemis sur la sphere.
+- Les ennemis sont en pixel art sur la sphere.
+- Au debut, les ennemis ne foncent vers le joueur que quand il est trop proche.
+- Quand un ennemi touche le joueur, le joueur perd un coeur.
+- Quand un ennemi touche le joueur et qu'il lui reste de la vie, le joueur revient au dernier point de sauvegarde et perd tout ce qui a ete acquis apres cette sauvegarde.
+- Quand le joueur reprend une sauvegarde, remettre le compteur de perte de vie periodique au maximum.
+- Apres un retour au point de sauvegarde, ne pas afficher immediatement la popup de confirmation de sauvegarde pour ce meme point; elle ne doit revenir qu'apres etre sorti de sa zone puis y revenir.
+- Si la vie tombe a zero, afficher un ecran "GAME OVER" en pixel art et arreter le gameplay actif.
+
+Vie periodique:
+- Ajouter un compteur qui descend avec le temps et informe le joueur quand il va perdre une vie.
+- Quand ce compteur arrive a zero, retirer un coeur au joueur, puis remettre le compteur au maximum.
+- La perte periodique d'un coeur ne recharge pas la sauvegarde tant qu'il reste de la vie.
+- La sauvegarde ne doit etre reprise que lorsque la vie tombe a zero.
+- Si le joueur ramasse un coeur, remettre ce compteur au maximum.
+- Afficher ce compteur dans le HUD.
+
+HUD:
+- Afficher un HUD en pixel art a droite de l'ecran.
+- Pour chaque ressource vie, energie, or, afficher:
+  - quantite actuelle/collectee.
+  - capacite maximale.
+  - quantite restante sur la sphere.
+- Afficher aussi le nombre d'ennemis restants.
+- Afficher la portee actuelle du radar `distRadar`.
+- Afficher le compteur avant perte de vie periodique.
+
+Radar:
+- Ajouter un radar autour de la bordure de la sphere.
+- La zone visible de la sphere doit etre legerement reduite pour que les indicateurs radar soient bien lisibles autour de la bordure.
+- Quand un objet est hors de la sphere visible mais dans la portee radar, afficher une petite icone pixel art autour de la bordure de la sphere.
+- L'icone doit indiquer la direction de l'objet.
+- Afficher a cote de l'icone la distance radar de l'objet, appelee `distRadar`:
+  - `0` signifie que l'objet est exactement sur la bordure visible.
+  - une valeur superieure signifie que l'objet est plus loin hors de la bordure visible.
+- Le radar doit pouvoir signaler les ressources, les magasins et les ennemis avec des couleurs distinctes.
+- Sur le radar, les ennemis doivent etre representes par une petite tete de mort en pixel art.
+- La portee du radar doit pouvoir etre augmentee dans le magasin contre de l'or.
+- Ajouter a gauche de l'ecran un panneau pixel art permettant d'activer ou desactiver les blips radar par type d'objet: vie, energie, or, magasin, sauvegarde, ennemi.
+
+Rendu:
+- Tout doit etre dessine dans le canvas.
+- Style pixel art.
+- Canvas plein ecran.
+- Pas de panneaux HTML lateraux.
+- Les sprites peuvent etre definis sous forme de grilles de caracteres dans le code TypeScript.
+- Utiliser une petite police pixel art dessinee dans le canvas pour le HUD, le magasin et le game over.
+
+Verification:
+- Le projet doit compiler avec `npm run build`.
+- Ne pas laisser de serveur actif apres les tests.

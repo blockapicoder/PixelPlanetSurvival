@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+  --ink: #eef2f3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #07090d;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  display: grid;
+  place-items: stretch;
+}
+
+main,
+.stage {
+  width: 100vw;
+  height: 100vh;
+}
+
+.stage {
+  background:
+    radial-gradient(circle at 50% 46%, rgba(93, 215, 210, 0.14), transparent 36%),
+    radial-gradient(circle at 20% 20%, rgba(255, 207, 90, 0.08), transparent 20%),
+    #07090d;
+  overflow: hidden;
+  position: relative;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  touch-action: none;
+}

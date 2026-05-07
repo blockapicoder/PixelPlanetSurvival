@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.server.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  "exclude": ["dist", "dist-server", "node_modules"]
+}
