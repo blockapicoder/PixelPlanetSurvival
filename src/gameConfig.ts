@@ -28,6 +28,40 @@ export const gameConfig = {
     minimumDistance: 3,
     collectionDistance: 2.8,
   },
+  biomes: {
+    sea: {
+      color: "#176b89",
+      resourceWeights: {
+        life: 1,
+        energy: 5,
+        gold: 1,
+      },
+    },
+    green: {
+      color: "#2f8f4e",
+      resourceWeights: {
+        life: 5,
+        energy: 2,
+        gold: 2,
+      },
+    },
+    desert: {
+      color: "#c9a45a",
+      resourceWeights: {
+        life: 1,
+        energy: 2,
+        gold: 6,
+      },
+    },
+    radioactive: {
+      color: "#8ee84f",
+      resourceWeights: {
+        life: 1,
+        energy: 7,
+        gold: 3,
+      },
+    },
+  },
   shops: {
     count: 8,
     openDistance: 3,
@@ -47,6 +81,12 @@ export const gameConfig = {
     aggroDistance: 24,
     hitDistance: 2.4,
     moveDistance: 0.62,
+  },
+  restore: {
+    collapseFrames: 38,
+    expandFrames: 30,
+    minVisibilityScale: 0.02,
+    playerExplosionTtl: 34,
   },
   shots: {
     moveDistance: 4.6,

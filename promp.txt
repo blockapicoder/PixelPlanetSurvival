@@ -1,7 +1,7 @@
 Creer une application web de jeu appelee "PixelPlanetSurvival" dans un projet TypeScript avec Vite pour le client et Express pour le serveur Node.js.
 
 Objectif general:
-Construire un jeu 2D en canvas, en pixel art, ou le joueur pilote un vaisseau qui navigue sur la projection d'une sphere. Le jeu doit etre plein ecran, sans interface HTML laterale, avec tous les elements visuels rendus dans le canvas.
+Construire un jeu 2D en canvas, en pixel art, ou le joueur pilote un personnage insecte sympathique qui navigue sur la projection d'une sphere. Le jeu doit etre plein ecran, sans interface HTML laterale, avec tous les elements visuels rendus dans le canvas.
 
 Stack technique:
 - TypeScript strict.
@@ -11,6 +11,8 @@ Stack technique:
   - `src/main.ts` pour le jeu.
   - `src/styles.css` pour le plein ecran.
   - `src/gameConfig.ts` pour tous les parametres modifiables du jeu.
+  - `src/model.ts` pour toutes les declarations de types et interfaces.
+  - `src/sprite.ts` pour tous les sprites pixel art et la police pixel.
 
 Contraintes de configuration:
 Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts`, notamment:
@@ -22,6 +24,7 @@ Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts
 - nombre de ressources sur la sphere.
 - distance minimale entre ressources.
 - distance de collecte.
+- couleurs et repartitions de ressources par biome.
 - nombre de magasins.
 - distance d'ouverture des magasins.
 - nombre de points de sauvegarde.
@@ -30,6 +33,7 @@ Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts
 - nombre d'ennemis.
 - distances d'agression et de collision des ennemis.
 - vitesse des ennemis.
+- duree de l'explosion joueur, duree de reduction/restauration de la zone visible et echelle minimale de visibilite pendant la restauration.
 - vitesse, portee et cout energetique des tirs.
 - parametres souris.
 - portee du radar `distRadar` et nombre maximal d'indicateurs radar.
@@ -38,18 +42,32 @@ Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts
 - couts et gains des ameliorations de portee radar en magasin.
 
 Gameplay:
-- Le joueur est un vaisseau en pixel art fixe au centre de l'ecran.
-- La sphere tourne/navigue sous le vaisseau.
+- Le joueur est un personnage insecte sympathique en pixel art fixe au centre de l'ecran.
+- Quand le personnage avance ou recule, alterner plusieurs frames de sprite avec des positions de pattes bien distinctes pour donner clairement l'impression qu'il marche.
+- La sphere tourne/navigue sous le personnage.
 - Les fleches clavier permettent de se deplacer et tourner.
-- Clic droit sur la sphere: le vaisseau tourne progressivement vers le point clique, puis avance vers ce point.
-- Clic gauche sur la sphere: le vaisseau tourne progressivement vers le point clique, puis tire dans cette direction.
+- Clic droit sur la sphere: le personnage tourne progressivement vers le point clique, puis avance vers ce point.
+- Clic gauche sur la sphere: le personnage tourne progressivement vers le point clique, puis tire dans cette direction.
 - Espace tire droit devant.
 - Un tir consomme de l'energie.
 - Les tirs se deplacent sur la surface de la sphere et detruisent les ennemis touches.
+- La collision des tirs doit tester le trajet parcouru entre deux frames, pas seulement la position finale, pour eviter qu'un projectile rapide traverse un ennemi sans le toucher.
+- Quand un tir touche un ennemi, afficher une petite explosion pixel art courte au point d'impact.
 - Si l'energie est insuffisante, le tir ne part pas.
 
 Ressources:
 - Generer des ressources sur la sphere avec une contrainte: toutes les ressources doivent etre separees par une distance superieure a une distance minimale configurable.
+- La planete doit etre divisee en 4 types de zones visibles, sous forme de grandes zones fermees de couleur uniforme comme une vue de planete depuis l'espace, sans chevauchement entre les zones:
+  - mer.
+  - terre verte.
+  - desert / terre couleur sable.
+  - terre radioactive.
+- Les ressources doivent avoir des repartitions differentes selon le type de zone:
+  - la terre verte favorise la vie.
+  - la mer favorise l'energie.
+  - le desert favorise l'or.
+  - la terre radioactive favorise fortement l'energie et un peu l'or.
+- Les zones doivent rester assez sobres pour que les ressources, ennemis, magasins et sauvegardes restent tres lisibles au-dessus.
 - Types de ressources:
   - coeur: vie.
   - eclair: energie.
@@ -89,6 +107,7 @@ Ennemis:
 - Les ennemis sont en pixel art sur la sphere.
 - Au debut, les ennemis ne foncent vers le joueur que quand il est trop proche.
 - Quand un ennemi touche le joueur, le joueur perd un coeur.
+- Quand un ennemi detruit/touche le joueur, afficher une explosion pixel art sur le joueur, reduire progressivement la zone visible de la sphere jusqu'a presque un point, puis restaurer la partie au dernier point de sauvegarde avec une reouverture progressive de la zone visible.
 - Quand un ennemi touche le joueur et qu'il lui reste de la vie, le joueur revient au dernier point de sauvegarde et perd tout ce qui a ete acquis apres cette sauvegarde.
 - Quand le joueur reprend une sauvegarde, remettre le compteur de perte de vie periodique au maximum.
 - Apres un retour au point de sauvegarde, ne pas afficher immediatement la popup de confirmation de sauvegarde pour ce meme point; elle ne doit revenir qu'apres etre sorti de sa zone puis y revenir.

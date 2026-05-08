@@ -1,99 +1,34 @@
 import "./styles.css";
 import { gameConfig, type CarryResourceKind } from "./gameConfig.ts";
-
-type Vec3 = {
-  x: number;
-  y: number;
-  z: number;
-};
-
-type ResourceKind = CarryResourceKind | "shop" | "save";
-
-type Resource = {
-  n: number;
-  pos: Vec3;
-  size: number;
-  kind: ResourceKind;
-};
-
-type ProjectedResource = Resource & {
-  depth: number;
-  x: number;
-  y: number;
-};
-
-type Enemy = {
-  id: number;
-  pos: Vec3;
-  size: number;
-};
-
-type Shot = {
-  pos: Vec3;
-  direction: Vec3;
-  ttl: number;
-};
-
-type ProjectedEnemy = Enemy & {
-  depth: number;
-  x: number;
-  y: number;
-};
-
-type ProjectedShot = Shot & {
-  depth: number;
-  x: number;
-  y: number;
-};
-
-type RadarObject = {
-  kind: ResourceKind | "enemy";
-  pos: Vec3;
-};
-
-type RadarKind = RadarObject["kind"];
-
-type ShopButton = {
-  action: "buy-life" | "buy-energy" | "buy-gold" | "buy-radar" | "close";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type RadarFilterButton = {
-  kind: RadarKind;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type SavePromptButton = {
-  action: "save-confirm" | "save-cancel";
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
-type SaveState = {
-  resourceId: number | null;
-  pos: Vec3;
-  resources: Record<CarryResourceKind, number>;
-  capacity: Record<CarryResourceKind, number>;
-  capacityPurchases: Record<CarryResourceKind, number>;
-  lifeDrainTimer: number;
-  distRadar: number;
-  radarPurchases: number;
-};
-
-type PixelSprite = {
-  rows: string[];
-  palette: Record<string, string>;
-};
-
-type PixelTextPattern = string[];
+import type {
+  BiomeKind,
+  Enemy,
+  Explosion,
+  PixelSprite,
+  ProjectedEnemy,
+  ProjectedExplosion,
+  ProjectedResource,
+  ProjectedShot,
+  RadarFilterButton,
+  RadarKind,
+  RadarObject,
+  Resource,
+  ResourceKind,
+  RestorePhase,
+  SavePromptButton,
+  SaveState,
+  ShopButton,
+  Shot,
+  Vec3,
+} from "./model.ts";
+import {
+  enemySprite,
+  pixelText,
+  playerSprites,
+  radarSkullSprite,
+  resourceSprites,
+  shotSprite,
+} from "./sprite.ts";
 
 const canvas = getElement<HTMLCanvasElement>("view");
 const ctx = getCanvasContext(canvas);
@@ -102,202 +37,16 @@ const TAU = Math.PI * 2;
 const moveStep = gameConfig.world.moveStep;
 const turnStep = gameConfig.world.turnStep;
 const collectionDistance = gameConfig.resources.collectionDistance;
-const resourceKinds: CarryResourceKind[] = ["life", "energy", "gold"];
-const pixelText: Record<string, PixelTextPattern> = {
-  "0": ["111", "101", "101", "101", "111"],
-  "1": ["010", "110", "010", "010", "111"],
-  "2": ["111", "001", "111", "100", "111"],
-  "3": ["111", "001", "111", "001", "111"],
-  "4": ["101", "101", "111", "001", "001"],
-  "5": ["111", "100", "111", "001", "111"],
-  "6": ["111", "100", "111", "101", "111"],
-  "7": ["111", "001", "010", "010", "010"],
-  "8": ["111", "101", "111", "101", "111"],
-  "9": ["111", "101", "111", "001", "111"],
-  A: ["111", "101", "111", "101", "101"],
-  B: ["110", "101", "110", "101", "110"],
-  C: ["111", "100", "100", "100", "111"],
-  D: ["110", "101", "101", "101", "110"],
-  E: ["111", "100", "111", "100", "111"],
-  F: ["111", "100", "111", "100", "100"],
-  G: ["111", "100", "101", "101", "111"],
-  H: ["101", "101", "111", "101", "101"],
-  I: ["111", "010", "010", "010", "111"],
-  L: ["100", "100", "100", "100", "111"],
-  M: ["101", "111", "111", "101", "101"],
-  O: ["111", "101", "101", "101", "111"],
-  N: ["101", "111", "111", "111", "101"],
-  P: ["110", "101", "110", "100", "100"],
-  R: ["110", "101", "110", "101", "101"],
-  S: ["111", "100", "111", "001", "111"],
-  T: ["111", "010", "010", "010", "010"],
-  U: ["101", "101", "101", "101", "111"],
-  V: ["101", "101", "101", "101", "010"],
-  X: ["101", "101", "010", "101", "101"],
-  Y: ["101", "101", "010", "010", "010"],
-  " ": ["000", "000", "000", "000", "000"],
-};
-const shipSprite: PixelSprite = {
-  rows: [
-    "......b......",
-    ".....bwb.....",
-    ".....bwb.....",
-    "....bwcwb....",
-    "...bwwcwwb...",
-    "..bwwcccwwb..",
-    ".bwwcccccwwb.",
-    ".bwwcwwwcwwb.",
-    "bbbcwwwwwcbbb",
-    "...bwwwwwb...",
-    "..brb...brb..",
-    ".brrb...brrb.",
-  ],
-  palette: {
-    b: "#111827",
-    w: "#d7f3ff",
-    c: "#5dd7d2",
-    r: "#ff6f61",
-  },
-};
-const resourceSprites: Record<ResourceKind, PixelSprite> = {
-  life: {
-    rows: [
-      "..rr..rr..",
-      ".rllrrllr.",
-      "rllllllllr",
-      "rllllllllr",
-      ".rllllllr.",
-      "..rllllr..",
-      "...rllr...",
-      "....rr....",
-    ],
-    palette: {
-      r: "#7d1025",
-      l: "#ff6f86",
-    },
-  },
-  energy: {
-    rows: [
-      "....yy...",
-      "...yyy...",
-      "..yyyy...",
-      "..yy.....",
-      ".yyyyy...",
-      "...yy....",
-      "..yy.....",
-      ".yy......",
-    ],
-    palette: {
-      y: "#ffef6e",
-    },
-  },
-  gold: {
-    rows: [
-      "..oooo..",
-      ".oggggo.",
-      "oggggggo",
-      "oggyyggo",
-      "oggyyggo",
-      "oggggggo",
-      ".oggggo.",
-      "..oooo..",
-    ],
-    palette: {
-      o: "#8f5d00",
-      g: "#ffcf5a",
-      y: "#fff1a8",
-    },
-  },
-  shop: {
-    rows: [
-      "bbbbbbbbbb",
-      "bppppppppb",
-      "bpbpbpbpbb",
-      "bbbbbbbbbb",
-      "bggggggggb",
-      "bggbggbggb",
-      "bggbggbggb",
-      "bbbbbbbbbb",
-    ],
-    palette: {
-      b: "#111827",
-      p: "#b779ff",
-      g: "#2dd4bf",
-    },
-  },
-  save: {
-    rows: [
-      "....c....",
-      "...ccc...",
-      "..cwcwc..",
-      ".cwwwwwc.",
-      ".cwgwwgc.",
-      "..cwwwc..",
-      "...cwc...",
-      "...cwc...",
-      "..bbbbb..",
-      ".bgggggb.",
-      "..bbbbb..",
-    ],
-    palette: {
-      b: "#111827",
-      c: "#60a5fa",
-      w: "#d7f3ff",
-      g: "#2dd4bf",
-    },
-  },
-};
-const enemySprite: PixelSprite = {
-  rows: [
-    "..d....d..",
-    ".drd..drd.",
-    ".drrrrrrd.",
-    "drrpddprrd",
-    "drrrrrrrrd",
-    ".drrrrrrd.",
-    "..drrrrd..",
-    ".dd.d..dd.",
-  ],
-  palette: {
-    d: "#330914",
-    r: "#dc2626",
-    p: "#ffd0d8",
-  },
-};
-const radarSkullSprite: PixelSprite = {
-  rows: [
-    ".bbbb.",
-    "bwwwwb",
-    "bwbwbb",
-    "bwwwwb",
-    ".bwwb.",
-    ".bbbb.",
-  ],
-  palette: {
-    b: "#111827",
-    w: "#e5edf2",
-  },
-};
-const shotSprite: PixelSprite = {
-  rows: [
-    ".yy.",
-    "yyyy",
-    "yyyy",
-    ".yy.",
-  ],
-  palette: {
-    y: "#ffef6e",
-  },
-};
-
 let p: Vec3;
 let forward: Vec3;
 let resources: Resource[] = [];
 let enemies: Enemy[] = [];
 let shots: Shot[] = [];
+let explosions: Explosion[] = [];
 let resourceCount: number = gameConfig.resources.count;
 let nextEnemyId = 1;
 let lastTime = 0;
+let playerWalkCycle = 0;
 let zoom: number = gameConfig.world.zoom;
 let sphereRadiusWorld: number = gameConfig.world.sphereRadius;
 let visibleRadiusWorld = 1;
@@ -336,6 +85,9 @@ let radarFilters: Record<RadarKind, boolean> = {
   enemy: true,
 };
 let radarFilterButtons: RadarFilterButton[] = [];
+let restorePhase: RestorePhase = "idle";
+let restoreTimer = 0;
+let visibilityScale = 1;
 
 const pressed = new Set<string>();
 
@@ -429,6 +181,70 @@ function respawnPlayer(): void {
   mouseMoveTarget = null;
   mouseShotTarget = null;
   shots = [];
+  explosions = [];
+}
+
+function startRestoreSequence(): void {
+  if (restorePhase !== "idle") {
+    return;
+  }
+
+  shopOpen = false;
+  pendingSavePoint = null;
+  activeShopId = null;
+  mouseMoveTarget = null;
+  mouseShotTarget = null;
+  pressed.clear();
+  shots = [];
+  explosions.push({
+    pos: p,
+    age: 0,
+    ttl: gameConfig.restore.playerExplosionTtl,
+  });
+  restorePhase = "collapse";
+  restoreTimer = 0;
+  visibilityScale = 1;
+}
+
+function updateRestoreSequence(dt: number): void {
+  if (restorePhase === "idle") {
+    return;
+  }
+
+  updateExplosions(dt);
+  restoreTimer += dt;
+
+  if (restorePhase === "collapse") {
+    const progress = clamp(restoreTimer / gameConfig.restore.collapseFrames, 0, 1);
+    visibilityScale = Math.max(gameConfig.restore.minVisibilityScale, 1 - progress);
+
+    if (progress < 1) {
+      return;
+    }
+
+    if (collectedResources.life <= 0) {
+      gameOver = true;
+      restorePhase = "idle";
+      restoreTimer = 0;
+      visibilityScale = 1;
+      return;
+    }
+
+    respawnPlayer();
+    restorePhase = "expand";
+    restoreTimer = 0;
+    visibilityScale = gameConfig.restore.minVisibilityScale;
+    return;
+  }
+
+  const progress = clamp(restoreTimer / gameConfig.restore.expandFrames, 0, 1);
+  visibilityScale = gameConfig.restore.minVisibilityScale + (1 - gameConfig.restore.minVisibilityScale) * progress;
+
+  if (progress >= 1) {
+    restorePhase = "idle";
+    restoreTimer = 0;
+    visibilityScale = 1;
+  }
 }
 
 function createSaveState(pos: Vec3, resourceId: number | null): void {
@@ -453,6 +269,55 @@ function randomUnitVector(): Vec3 {
   return vec(Math.cos(theta) * radius, Math.sin(theta) * radius, z);
 }
 
+function terrainNoise(pos: Vec3): number {
+  return (
+    Math.sin(pos.x * 7.1 + pos.y * 2.3) +
+    Math.sin(pos.y * 8.7 - pos.z * 4.4) * 0.7 +
+    Math.cos(pos.z * 6.2 + pos.x * 3.8) * 0.6
+  ) / 2.3;
+}
+
+function getBiome(pos: Vec3): BiomeKind {
+  const noise = terrainNoise(pos);
+
+  if (noise < -0.32) {
+    return "sea";
+  }
+
+  if (noise > 0.58 || (pos.z > 0.62 && noise > 0.24)) {
+    return "radioactive";
+  }
+
+  if (noise > 0.18 || pos.z < -0.42) {
+    return "desert";
+  }
+
+  return "green";
+}
+
+function getBiomeColor(biome: BiomeKind): string {
+  return gameConfig.biomes[biome].color;
+}
+
+function pickResourceKindForBiome(biome: BiomeKind): CarryResourceKind {
+  const weights = gameConfig.biomes[biome].resourceWeights;
+  const total = weights.life + weights.energy + weights.gold;
+  let roll = Math.random() * total;
+
+  if (roll < weights.life) {
+    return "life";
+  }
+
+  roll -= weights.life;
+
+  if (roll < weights.energy) {
+    return "energy";
+  }
+
+  return "gold";
+}
+
+
 function surfaceDistance(a: Vec3, b: Vec3): number {
   return Math.acos(clamp(dot(a, b), -1, 1)) * sphereRadiusWorld;
 }
@@ -465,6 +330,18 @@ function moveAlongSurface(pos: Vec3, direction: Vec3, distance: number): { pos: 
   const nextDirection = norm(add(scale(pos, -s), scale(direction, c)));
 
   return { pos: nextPos, direction: nextDirection };
+}
+
+function minDistanceToShotPath(start: Vec3, direction: Vec3, travelDistance: number, target: Vec3): number {
+  const steps = Math.max(3, Math.ceil(travelDistance / Math.max(0.8, gameConfig.shots.hitDistance * 0.45)));
+  let minDistance = Number.POSITIVE_INFINITY;
+
+  for (let step = 0; step <= steps; step += 1) {
+    const sample = moveAlongSurface(start, direction, (travelDistance * step) / steps).pos;
+    minDistance = Math.min(minDistance, surfaceDistance(sample, target));
+  }
+
+  return minDistance;
 }
 
 function moveTowardOnSurface(pos: Vec3, target: Vec3, distance: number): Vec3 {
@@ -527,7 +404,7 @@ function makeResources(count = resourceCount, minDistance = minimumResourceDista
       n: index + 1,
       pos,
       size: 0.75 + Math.random() * 0.45,
-      kind: resourceKinds[index % resourceKinds.length],
+      kind: pickResourceKindForBiome(getBiome(pos)),
     });
   }
 
@@ -605,30 +482,33 @@ function move(distance: number): void {
   forward = norm(nextForward);
 }
 
-function moveToMouseTarget(dt: number): void {
+function moveToMouseTarget(dt: number): boolean {
   if (!mouseMoveTarget) {
-    return;
+    return false;
   }
 
   const distanceToTarget = surfaceDistance(p, mouseMoveTarget);
 
   if (distanceToTarget <= gameConfig.mouse.targetDistance) {
     mouseMoveTarget = null;
-    return;
+    return false;
   }
 
   const nextForward = tangentToward(p, mouseMoveTarget);
 
   if (!nextForward) {
     mouseMoveTarget = null;
-    return;
+    return false;
   }
 
   const aligned = rotateForwardToward(nextForward, gameConfig.mouse.turnStep * dt);
 
   if (aligned || Math.abs(signedAngleAroundAxis(forward, nextForward, p)) <= gameConfig.mouse.alignmentAngle) {
     move(Math.min(moveStep * speed * dt, distanceToTarget / sphereRadiusWorld));
+    return true;
   }
+
+  return false;
 }
 
 function turn(angle: number): void {
@@ -707,7 +587,7 @@ function collectNearbyResources(): void {
 }
 
 function fireShot(direction = forward): void {
-  if (gameOver || shopOpen || collectedResources.energy < gameConfig.shots.energyCost) {
+  if (gameOver || restorePhase !== "idle" || shopOpen || collectedResources.energy < gameConfig.shots.energyCost) {
     return;
   }
 
@@ -744,7 +624,8 @@ function updateShots(dt: number): void {
   const destroyedEnemies = new Set<number>();
 
   for (const shot of shots) {
-    const moved = moveAlongSurface(shot.pos, shot.direction, gameConfig.shots.moveDistance * dt);
+    const travelDistance = gameConfig.shots.moveDistance * dt;
+    const moved = moveAlongSurface(shot.pos, shot.direction, travelDistance);
     const nextShot: Shot = {
       pos: moved.pos,
       direction: moved.direction,
@@ -754,11 +635,17 @@ function updateShots(dt: number): void {
     const hitEnemy = enemies.find(
       (enemy) =>
         !destroyedEnemies.has(enemy.id) &&
-        surfaceDistance(nextShot.pos, enemy.pos) <= gameConfig.shots.hitDistance,
+        minDistanceToShotPath(shot.pos, shot.direction, travelDistance, enemy.pos) <=
+          gameConfig.shots.hitDistance + enemy.size,
     );
 
     if (hitEnemy) {
       destroyedEnemies.add(hitEnemy.id);
+      explosions.push({
+        pos: nextShot.pos,
+        age: 0,
+        ttl: 18,
+      });
       continue;
     }
 
@@ -774,10 +661,17 @@ function updateShots(dt: number): void {
   shots = nextShots;
 }
 
+function updateExplosions(dt: number): void {
+  explosions = explosions
+    .map((explosion) => ({ ...explosion, age: explosion.age + dt }))
+    .filter((explosion) => explosion.age < explosion.ttl);
+}
+
 function updateEnemies(dt: number): void {
   const remainingEnemies: Enemy[] = [];
 
-  for (const enemy of enemies) {
+  for (let index = 0; index < enemies.length; index += 1) {
+    const enemy = enemies[index];
     let nextEnemy = enemy;
     const distanceToPlayer = surfaceDistance(enemy.pos, p);
 
@@ -790,13 +684,9 @@ function updateEnemies(dt: number): void {
 
     if (surfaceDistance(nextEnemy.pos, p) <= gameConfig.enemies.hitDistance) {
       collectedResources.life = Math.max(0, collectedResources.life - 1);
-      gameOver = collectedResources.life <= 0;
-
-      if (!gameOver) {
-        respawnPlayer();
-      }
-
-      continue;
+      startRestoreSequence();
+      remainingEnemies.push(...enemies.slice(index + 1));
+      break;
     }
 
     remainingEnemies.push(nextEnemy);
@@ -898,7 +788,8 @@ function getProjectionBasis(): { cx: number; cy: number; clipRadius: number; sph
   const height = canvas.clientHeight;
   const cx = width / 2;
   const cy = height / 2;
-  const clipRadius = Math.max(40, Math.min(width, height) / 2 - gameConfig.radar.visionMargin);
+  const baseClipRadius = Math.max(40, Math.min(width, height) / 2 - gameConfig.radar.visionMargin);
+  const clipRadius = Math.max(1, baseClipRadius * visibilityScale);
   const sphereRadius = (clipRadius * sphereRadiusWorld) / visibleRadiusWorld;
   const right = norm(cross(forward, p));
 
@@ -1047,6 +938,41 @@ function drawGrid(cx: number, cy: number, radius: number): void {
   ctx.restore();
 }
 
+function drawTerrain(cx: number, cy: number, radius: number, right: Vec3): void {
+  const tileSize = Math.max(4, Math.floor(radius / 120));
+  const left = Math.floor(cx - radius);
+  const top = Math.floor(cy - radius);
+  const diameter = Math.ceil(radius * 2);
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (let y = top; y <= top + diameter; y += tileSize) {
+    for (let x = left; x <= left + diameter; x += tileSize) {
+      const localX = (x + tileSize / 2 - cx) / radius;
+      const localY = -(y + tileSize / 2 - cy) / radius;
+      const localRadiusSq = localX * localX + localY * localY;
+
+      if (localRadiusSq > 1) {
+        continue;
+      }
+
+      const depth = Math.sqrt(1 - localRadiusSq);
+      const surfacePos = norm(add(add(scale(right, localX), scale(forward, localY)), scale(p, depth)));
+      const light = 0.78 + depth * 0.18;
+
+      ctx.globalAlpha = light;
+      ctx.fillStyle = getBiomeColor(getBiome(surfacePos));
+      ctx.fillRect(x, y, tileSize + 1, tileSize + 1);
+    }
+  }
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(7, 9, 13, 0.16)";
+  ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+  ctx.restore();
+}
+
 function drawPixelSprite(sprite: PixelSprite, x: number, y: number, pixelSize: number): void {
   const width = sprite.rows[0]?.length ?? 0;
   const height = sprite.rows.length;
@@ -1080,8 +1006,10 @@ function drawPixelSprite(sprite: PixelSprite, x: number, y: number, pixelSize: n
   ctx.restore();
 }
 
-function drawShip(cx: number, cy: number): void {
-  drawPixelSprite(shipSprite, cx, cy - 6, 4);
+function drawPlayer(cx: number, cy: number): void {
+  const frameIndex = Math.floor(playerWalkCycle / 6) % playerSprites.length;
+  const bob = playerWalkCycle > 0 && frameIndex % 2 === 1 ? -2 : 0;
+  drawPixelSprite(playerSprites[frameIndex], cx, cy - 7 + bob, 4);
 }
 
 function drawPixelText(text: string, x: number, y: number, pixelSize: number, color: string): void {
@@ -1211,6 +1139,34 @@ function drawShot(shot: ProjectedShot, size: number, front: boolean): void {
   }
 
   drawPixelSprite(shotSprite, shot.x, shot.y, Math.max(2, Math.min(4, size / 3)));
+}
+
+function drawExplosion(explosion: ProjectedExplosion, front: boolean): void {
+  if (!front) {
+    return;
+  }
+
+  const progress = explosion.age / explosion.ttl;
+  const radius = 8 + progress * 22;
+  const sparks = 8;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = 1 - progress;
+
+  for (let index = 0; index < sparks; index += 1) {
+    const angle = (index / sparks) * TAU + progress * 0.8;
+    const distance = radius * (0.35 + progress);
+    const x = explosion.x + Math.cos(angle) * distance;
+    const y = explosion.y + Math.sin(angle) * distance;
+
+    ctx.fillStyle = index % 2 === 0 ? "#ffcf5a" : "#ff6f61";
+    ctx.fillRect(Math.round(x - 3), Math.round(y - 3), 6, 6);
+  }
+
+  ctx.fillStyle = progress < 0.5 ? "#fff1a8" : "#ffcf5a";
+  ctx.fillRect(Math.round(explosion.x - 4), Math.round(explosion.y - 4), 8, 8);
+  ctx.restore();
 }
 
 function getRadarColor(kind: RadarObject["kind"]): string {
@@ -1549,6 +1505,7 @@ function draw(): void {
   shade.addColorStop(1, "#090b0e");
   ctx.fillStyle = shade;
   ctx.fillRect(cx - clipRadius, cy - clipRadius, clipRadius * 2, clipRadius * 2);
+  drawTerrain(cx, cy, sphereRadius, right);
   drawGrid(cx, cy, sphereRadius);
 
   const projected = resources
@@ -1587,6 +1544,18 @@ function draw(): void {
       };
     })
     .sort((a, b) => a.depth - b.depth);
+  const projectedExplosions = explosions
+    .map<ProjectedExplosion>((explosion) => {
+      const depth = dot(explosion.pos, p);
+
+      return {
+        ...explosion,
+        depth,
+        x: cx + dot(explosion.pos, right) * sphereRadius,
+        y: cy - dot(explosion.pos, forward) * sphereRadius,
+      };
+    })
+    .sort((a, b) => a.depth - b.depth);
 
   for (const resource of projected) {
     const front = resource.depth >= 0;
@@ -1614,6 +1583,13 @@ function draw(): void {
     drawShot(shot, size, front);
   }
 
+  for (const explosion of projectedExplosions) {
+    const front = explosion.depth >= 0;
+
+    ctx.globalAlpha = front ? 1 : 0;
+    drawExplosion(explosion, front);
+  }
+
   ctx.globalAlpha = 1;
   ctx.restore();
 
@@ -1629,8 +1605,14 @@ function draw(): void {
   ctx.arc(cx, cy, clipRadius + 8, -Math.PI / 2 - 0.25, -Math.PI / 2 + 0.25);
   ctx.stroke();
 
-  drawRadarBlips(cx, cy, clipRadius, sphereRadius, right);
-  drawShip(cx, cy);
+  if (restorePhase === "idle") {
+    drawRadarBlips(cx, cy, clipRadius, sphereRadius, right);
+  }
+
+  if (restorePhase !== "collapse") {
+    drawPlayer(cx, cy);
+  }
+
   drawRadarFilterPanel(height);
   drawHud(width);
   drawShopInterface(width, height);
@@ -1642,17 +1624,32 @@ function step(time: number): void {
   const dt = Math.min(32, time - lastTime || 16) / 16.67;
   lastTime = time;
 
-  if (!gameOver && !shopOpen && !pendingSavePoint) {
-    if (pressed.has("ArrowUp")) move(moveStep * speed * dt);
-    if (pressed.has("ArrowDown")) move(-moveStep * speed * dt);
+  if (restorePhase !== "idle") {
+    updateRestoreSequence(dt);
+  } else if (!gameOver && !shopOpen && !pendingSavePoint) {
+    let isWalking = false;
+    const wantsToWalk = pressed.has("ArrowUp") || pressed.has("ArrowDown") || mouseMoveTarget !== null;
+
+    if (pressed.has("ArrowUp")) {
+      move(moveStep * speed * dt);
+      isWalking = true;
+    }
+
+    if (pressed.has("ArrowDown")) {
+      move(-moveStep * speed * dt);
+      isWalking = true;
+    }
+
     if (pressed.has("ArrowRight")) turn(-turnStep * speed * dt);
     if (pressed.has("ArrowLeft")) turn(turnStep * speed * dt);
 
-    moveToMouseTarget(dt);
+    isWalking = moveToMouseTarget(dt) || isWalking;
+    playerWalkCycle = wantsToWalk || isWalking ? playerWalkCycle + dt * 1.6 : 0;
     updateMouseShot(dt);
     collectNearbyResources();
     updateLifeDrain(dt);
     updateShots(dt);
+    updateExplosions(dt);
     updateEnemies(dt);
   }
 
@@ -1663,6 +1660,10 @@ function step(time: number): void {
 window.addEventListener("keydown", (event) => {
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(event.key)) {
     event.preventDefault();
+  }
+
+  if (restorePhase !== "idle") {
+    return;
   }
 
   if (event.key === "Escape" && shopOpen) {
@@ -1692,6 +1693,11 @@ canvas.addEventListener("contextmenu", (event) => {
 });
 
 canvas.addEventListener("mousedown", (event) => {
+  if (restorePhase !== "idle") {
+    event.preventDefault();
+    return;
+  }
+
   if (handleSavePromptClick(event)) {
     event.preventDefault();
     return;
