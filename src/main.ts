@@ -1,5 +1,5 @@
 import "./styles.css";
-import { gameConfig, type CarryResourceKind } from "./gameConfig.ts";
+import { gameConfig, type CarryResourceKind, type EnemyCategoryId, type EnemyConfig } from "./gameConfig.ts";
 import type {
   BiomeKind,
   Enemy,
@@ -22,7 +22,7 @@ import type {
   Vec3,
 } from "./model.ts";
 import {
-  enemySprite,
+  enemySprites,
   pixelText,
   playerSprites,
   radarSkullSprite,
@@ -59,7 +59,7 @@ let capacityUpgradePurchases: Record<CarryResourceKind, number> = {
   energy: 0,
   gold: 0,
 };
-let lifeDrainTimer: number = gameConfig.player.lifeDrain.intervalFrames;
+let lifeDrainTimer: number = gameConfig.biomes.green.lifeDrain.intervalFrames;
 let distRadar: number = gameConfig.radar.initialRange;
 let radarUpgradePurchases = 0;
 let gameOver = false;
@@ -170,7 +170,7 @@ function respawnPlayer(): void {
     collectedResources = { ...saveState.resources };
     resourceCapacity = { ...saveState.capacity };
     capacityUpgradePurchases = { ...saveState.capacityPurchases };
-    lifeDrainTimer = gameConfig.player.lifeDrain.intervalFrames;
+    lifeDrainTimer = getCurrentLifeDrainInterval();
     distRadar = saveState.distRadar;
     radarUpgradePurchases = saveState.radarPurchases;
     ignoredSaveId = saveState.resourceId;
@@ -299,6 +299,14 @@ function getBiomeColor(biome: BiomeKind): string {
   return gameConfig.biomes[biome].color;
 }
 
+function getCurrentLifeDrainInterval(): number {
+  return gameConfig.biomes[getBiome(p)].lifeDrain.intervalFrames;
+}
+
+function isEnemyBiomeBlocked(pos: Vec3, enemyConfig: EnemyConfig): boolean {
+  return enemyConfig.blockedBiomes.includes(getBiome(pos));
+}
+
 function pickResourceKindForBiome(biome: BiomeKind): CarryResourceKind {
   const weights = gameConfig.biomes[biome].resourceWeights;
   const total = weights.life + weights.energy + weights.gold;
@@ -316,7 +324,6 @@ function pickResourceKindForBiome(biome: BiomeKind): CarryResourceKind {
 
   return "gold";
 }
-
 
 function surfaceDistance(a: Vec3, b: Vec3): number {
   return Math.acos(clamp(dot(a, b), -1, 1)) * sphereRadiusWorld;
@@ -344,14 +351,75 @@ function minDistanceToShotPath(start: Vec3, direction: Vec3, travelDistance: num
   return minDistance;
 }
 
-function moveTowardOnSurface(pos: Vec3, target: Vec3, distance: number): Vec3 {
+function moveEnemyTowardAllowedBiomes(pos: Vec3, target: Vec3, distance: number, enemyConfig: EnemyConfig): Vec3 {
   const tangent = add(target, scale(pos, -dot(target, pos)));
 
   if (Math.hypot(tangent.x, tangent.y, tangent.z) < 0.0001) {
     return pos;
   }
 
-  return moveAlongSurface(pos, norm(tangent), distance).pos;
+  const direction = norm(tangent);
+  const steps = Math.max(2, Math.ceil(distance / 0.4));
+
+  for (let step = 1; step <= steps; step += 1) {
+    const sample = moveAlongSurface(pos, direction, (distance * step) / steps).pos;
+
+    if (isEnemyBiomeBlocked(sample, enemyConfig)) {
+      return pos;
+    }
+  }
+
+  return moveAlongSurface(pos, direction, distance).pos;
+}
+
+function getEnemySize(enemyConfig: EnemyConfig): number {
+  return enemyConfig.size + Math.random() * enemyConfig.sizeVariance;
+}
+
+function getEnemyConfig(categoryId: EnemyCategoryId): EnemyConfig {
+  return gameConfig.enemies[categoryId] as EnemyConfig;
+}
+
+function createEnemy(categoryId: EnemyCategoryId, pos: Vec3, spawnedById?: number): Enemy {
+  const enemyConfig = getEnemyConfig(categoryId);
+
+  return {
+    id: nextEnemyId++,
+    categoryId,
+    pos,
+    size: getEnemySize(enemyConfig),
+    spawnTimer: enemyConfig.spawn ? Math.random() * enemyConfig.spawn.intervalFrames : 0,
+    exploreTimer: enemyConfig.explore ? Math.random() * enemyConfig.explore.retargetFrames : 0,
+    exploreTarget: enemyConfig.explore ? findEnemyExploreTarget(pos, enemyConfig) ?? undefined : undefined,
+    spawnedById,
+  };
+}
+
+function findEnemySpawnPosition(origin: Vec3, enemyConfig: EnemyConfig, distance: number): Vec3 | null {
+  for (let attempt = 0; attempt < 16; attempt += 1) {
+    const random = randomUnitVector();
+    const tangent = add(random, scale(origin, -dot(random, origin)));
+
+    if (Math.hypot(tangent.x, tangent.y, tangent.z) < 0.0001) {
+      continue;
+    }
+
+    const pos = moveEnemyTowardAllowedBiomes(origin, norm(tangent), distance, enemyConfig);
+
+    if (pos !== origin && !isEnemyBiomeBlocked(pos, enemyConfig)) {
+      return pos;
+    }
+  }
+
+  return null;
+}
+
+function findEnemyExploreTarget(origin: Vec3, enemyConfig: EnemyConfig): Vec3 | null {
+  if (!enemyConfig.explore) {
+    return null;
+  }
+
+  return findEnemySpawnPosition(origin, enemyConfig, enemyConfig.explore.targetDistance);
 }
 
 function tangentToward(from: Vec3, target: Vec3): Vec3 | null {
@@ -449,25 +517,33 @@ function makeResources(count = resourceCount, minDistance = minimumResourceDista
   resources = next;
 }
 
-function makeEnemies(count = gameConfig.enemies.count): void {
+function makeEnemies(): void {
   const next: Enemy[] = [];
-  const maxAttempts = count * 120;
-  let attempts = 0;
+  const entries = Object.keys(gameConfig.enemies).map((categoryId) => [
+    categoryId as EnemyCategoryId,
+    getEnemyConfig(categoryId as EnemyCategoryId),
+  ]) as Array<[EnemyCategoryId, EnemyConfig]>;
 
-  while (next.length < count && attempts < maxAttempts) {
-    attempts += 1;
-    const pos = randomUnitVector();
+  for (const [categoryId, enemyConfig] of entries) {
+    const maxAttempts = enemyConfig.count * 120;
+    let attempts = 0;
+    let categoryCount = 0;
 
-    if (surfaceDistance(pos, p) < gameConfig.enemies.aggroDistance * 1.4) {
-      continue;
+    while (categoryCount < enemyConfig.count && attempts < maxAttempts) {
+      attempts += 1;
+      const pos = randomUnitVector();
+
+      if (isEnemyBiomeBlocked(pos, enemyConfig)) {
+        continue;
+      }
+
+      if (surfaceDistance(pos, p) < enemyConfig.aggroDistance * 1.4) {
+        continue;
+      }
+
+      next.push(createEnemy(categoryId, pos));
+      categoryCount += 1;
     }
-
-    next.push({
-      id: nextEnemyId,
-      pos,
-      size: 0.9 + Math.random() * 0.35,
-    });
-    nextEnemyId += 1;
   }
 
   enemies = next;
@@ -565,7 +641,7 @@ function collectNearbyResources(): void {
       );
 
       if (resource.kind === "life") {
-        lifeDrainTimer = gameConfig.player.lifeDrain.intervalFrames;
+        lifeDrainTimer = getCurrentLifeDrainInterval();
       }
 
       continue;
@@ -669,20 +745,75 @@ function updateExplosions(dt: number): void {
 
 function updateEnemies(dt: number): void {
   const remainingEnemies: Enemy[] = [];
+  const spawnedEnemies: Enemy[] = [];
 
   for (let index = 0; index < enemies.length; index += 1) {
     const enemy = enemies[index];
+    const enemyConfig = getEnemyConfig(enemy.categoryId);
     let nextEnemy = enemy;
     const distanceToPlayer = surfaceDistance(enemy.pos, p);
 
-    if (distanceToPlayer <= gameConfig.enemies.aggroDistance) {
+    if (enemyConfig.spawn) {
+      const spawnTimer = enemy.spawnTimer - dt;
+      const activeChildren = enemies.filter((candidate) => candidate.spawnedById === enemy.id).length;
+
+      if (spawnTimer <= 0 && activeChildren < enemyConfig.spawn.maxChildren) {
+        const childCategoryId = enemyConfig.spawn.categoryId as EnemyCategoryId;
+        const childConfig = getEnemyConfig(childCategoryId);
+        const childPos = findEnemySpawnPosition(enemy.pos, childConfig, enemyConfig.spawn.spawnDistance);
+
+        if (childPos) {
+          spawnedEnemies.push(createEnemy(childCategoryId, childPos, enemy.id));
+        }
+      }
+
       nextEnemy = {
-        ...enemy,
-        pos: moveTowardOnSurface(enemy.pos, p, gameConfig.enemies.moveDistance * dt),
+        ...nextEnemy,
+        spawnTimer:
+          spawnTimer <= 0
+            ? enemyConfig.spawn.intervalFrames + Math.max(0, spawnTimer)
+            : spawnTimer,
       };
     }
 
-    if (surfaceDistance(nextEnemy.pos, p) <= gameConfig.enemies.hitDistance) {
+    if (enemyConfig.canMove && distanceToPlayer <= enemyConfig.aggroDistance) {
+      nextEnemy = {
+        ...nextEnemy,
+        pos: moveEnemyTowardAllowedBiomes(enemy.pos, p, enemyConfig.moveDistance * dt, enemyConfig),
+      };
+    } else if (enemyConfig.canMove && enemyConfig.explore) {
+      let exploreTimer = enemy.exploreTimer - dt;
+      let exploreTarget = enemy.exploreTarget;
+
+      if (!exploreTarget || exploreTimer <= 0 || surfaceDistance(enemy.pos, exploreTarget) <= enemyConfig.moveDistance * dt) {
+        exploreTarget = findEnemyExploreTarget(enemy.pos, enemyConfig) ?? undefined;
+        exploreTimer = enemyConfig.explore.retargetFrames;
+      }
+
+      if (exploreTarget) {
+        const nextPos = moveEnemyTowardAllowedBiomes(enemy.pos, exploreTarget, enemyConfig.moveDistance * dt, enemyConfig);
+
+        if (nextPos === enemy.pos) {
+          exploreTarget = findEnemyExploreTarget(enemy.pos, enemyConfig) ?? undefined;
+          exploreTimer = enemyConfig.explore.retargetFrames;
+        }
+
+        nextEnemy = {
+          ...nextEnemy,
+          pos: nextPos,
+          exploreTimer,
+          exploreTarget,
+        };
+      } else {
+        nextEnemy = {
+          ...nextEnemy,
+          exploreTimer,
+          exploreTarget,
+        };
+      }
+    }
+
+    if (surfaceDistance(nextEnemy.pos, p) <= enemyConfig.hitDistance) {
       collectedResources.life = Math.max(0, collectedResources.life - 1);
       startRestoreSequence();
       remainingEnemies.push(...enemies.slice(index + 1));
@@ -692,10 +823,12 @@ function updateEnemies(dt: number): void {
     remainingEnemies.push(nextEnemy);
   }
 
-  enemies = remainingEnemies;
+  enemies = [...remainingEnemies, ...spawnedEnemies];
 }
 
 function updateLifeDrain(dt: number): void {
+  const intervalFrames = getCurrentLifeDrainInterval();
+  lifeDrainTimer = Math.min(lifeDrainTimer, intervalFrames);
   lifeDrainTimer = Math.max(0, lifeDrainTimer - dt);
 
   if (lifeDrainTimer > 0) {
@@ -703,7 +836,7 @@ function updateLifeDrain(dt: number): void {
   }
 
   collectedResources.life = Math.max(0, collectedResources.life - 1);
-  lifeDrainTimer = gameConfig.player.lifeDrain.intervalFrames;
+  lifeDrainTimer = intervalFrames;
   gameOver = collectedResources.life <= 0;
 }
 
@@ -1045,54 +1178,64 @@ function drawPixelText(text: string, x: number, y: number, pixelSize: number, co
   ctx.restore();
 }
 
-function drawHud(width: number): void {
+function drawPanelFrame(x: number, y: number, width: number, height: number): void {
+  ctx.fillStyle = "rgba(6, 9, 14, 0.82)";
+  ctx.fillRect(x, y, width, height);
+  ctx.strokeStyle = "#5dd7d2";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(x + 6, y + 6, width - 12, height - 12);
+  ctx.strokeStyle = "#203845";
+  ctx.strokeRect(x + 7, y + 7, width - 14, height - 14);
+}
+
+function getHudRows(remainingResources: Record<CarryResourceKind, number>): Array<{
+  kind: CarryResourceKind;
+  color: string;
+  collected: number;
+  capacity: number;
+  remaining: number;
+}> {
+  return [
+    {
+      kind: "life",
+      color: "#ff6f86",
+      collected: collectedResources.life,
+      capacity: resourceCapacity.life,
+      remaining: remainingResources.life,
+    },
+    {
+      kind: "energy",
+      color: "#ffef6e",
+      collected: collectedResources.energy,
+      capacity: resourceCapacity.energy,
+      remaining: remainingResources.energy,
+    },
+    {
+      kind: "gold",
+      color: "#ffcf5a",
+      collected: collectedResources.gold,
+      capacity: resourceCapacity.gold,
+      remaining: remainingResources.gold,
+    },
+  ];
+}
+
+function drawInventoryPanel(rows: ReturnType<typeof getHudRows>): void {
   const pixelSize = 3;
-  const panelWidth = 270;
-  const panelHeight = 210;
-  const x = Math.max(16, width - panelWidth - 22);
+  const panelWidth = 188;
+  const panelHeight = 138;
+  const x = 22;
   const y = 22;
-  const remainingResources = countRemainingResources();
-  const rows: Array<{ kind: CarryResourceKind; color: string; collected: number; capacity: number; remaining: number }> =
-    [
-      {
-        kind: "life",
-        color: "#ff6f86",
-        collected: collectedResources.life,
-        capacity: resourceCapacity.life,
-        remaining: remainingResources.life,
-      },
-      {
-        kind: "energy",
-        color: "#ffef6e",
-        collected: collectedResources.energy,
-        capacity: resourceCapacity.energy,
-        remaining: remainingResources.energy,
-      },
-      {
-        kind: "gold",
-        color: "#ffcf5a",
-        collected: collectedResources.gold,
-        capacity: resourceCapacity.gold,
-        remaining: remainingResources.gold,
-      },
-    ];
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = "rgba(6, 9, 14, 0.82)";
-  ctx.fillRect(x, y, panelWidth, panelHeight);
-  ctx.strokeStyle = "#5dd7d2";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(x + 1, y + 1, panelWidth - 2, panelHeight - 2);
-  ctx.fillStyle = "#111827";
-  ctx.fillRect(x + 6, y + 6, panelWidth - 12, panelHeight - 12);
-  ctx.strokeStyle = "#203845";
-  ctx.strokeRect(x + 7, y + 7, panelWidth - 14, panelHeight - 14);
+  drawPanelFrame(x, y, panelWidth, panelHeight);
 
-  drawPixelText("RESSOURCES", x + 18, y + 16, 3, "#eef2f3");
+  drawPixelText("INVENTAIRE", x + 18, y + 16, 3, "#eef2f3");
   drawPixelText("COL", x + 58, y + 39, 2, "#a9b1b7");
-  drawPixelText("CAP", x + 122, y + 39, 2, "#a9b1b7");
-  drawPixelText("RESTE", x + 178, y + 39, 2, "#a9b1b7");
+  drawPixelText("CAP", x + 120, y + 39, 2, "#a9b1b7");
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
@@ -1100,8 +1243,32 @@ function drawHud(width: number): void {
 
     drawPixelSprite(resourceSprites[row.kind], x + 34, rowY + 7, 2.5);
     drawPixelText(String(row.collected), x + 58, rowY, pixelSize, row.color);
-    drawPixelText(String(row.capacity), x + 122, rowY, pixelSize, row.color);
-    drawPixelText(String(row.remaining), x + 178, rowY, pixelSize, row.color);
+    drawPixelText(String(row.capacity), x + 120, rowY, pixelSize, row.color);
+  }
+  ctx.restore();
+}
+
+function drawHud(width: number): void {
+  const pixelSize = 3;
+  const panelWidth = 220;
+  const panelHeight = 210;
+  const x = Math.max(16, width - panelWidth - 22);
+  const y = 22;
+  const rows = getHudRows(countRemainingResources());
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  drawPanelFrame(x, y, panelWidth, panelHeight);
+
+  drawPixelText("SUR SPHERE", x + 18, y + 16, 3, "#eef2f3");
+  drawPixelText("RESTE", x + 72, y + 39, 2, "#a9b1b7");
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    const rowY = y + 58 + index * 24;
+
+    drawPixelSprite(resourceSprites[row.kind], x + 36, rowY + 7, 2.5);
+    drawPixelText(String(row.remaining), x + 72, rowY, pixelSize, row.color);
   }
 
   drawPixelText("ENNEMIS", x + 18, y + 132, 2, "#ff6f61");
@@ -1111,6 +1278,8 @@ function drawHud(width: number): void {
   drawPixelText("VIE DANS", x + 18, y + 176, 2, "#ff6f86");
   drawPixelText(String(Math.ceil(lifeDrainTimer / 60)), x + 126, y + 172, pixelSize, "#ff6f86");
   ctx.restore();
+
+  drawInventoryPanel(rows);
 }
 
 function drawResource(resource: ProjectedResource, size: number, front: boolean): void {
@@ -1130,7 +1299,7 @@ function drawEnemy(enemy: ProjectedEnemy, size: number, front: boolean): void {
     return;
   }
 
-  drawPixelSprite(enemySprite, enemy.x, enemy.y, Math.max(2, Math.min(5, size / 4)));
+  drawPixelSprite(enemySprites[enemy.categoryId], enemy.x, enemy.y, Math.max(2, Math.min(5, size / 4)));
 }
 
 function drawShot(shot: ProjectedShot, size: number, front: boolean): void {
@@ -1191,7 +1360,7 @@ function drawRadarFilterPanel(height: number): void {
   const panelWidth = 176;
   const panelHeight = 226;
   const x = 22;
-  const y = Math.max(22, height / 2 - panelHeight / 2);
+  const y = Math.max(178, height / 2 - panelHeight / 2);
   const rows: Array<{ kind: RadarKind; label: string }> = [
     { kind: "life", label: "VIE" },
     { kind: "energy", label: "ENERGIE" },

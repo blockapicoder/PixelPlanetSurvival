@@ -1,3 +1,4 @@
+import type { EnemyCategoryId } from "./gameConfig.ts";
 import type { PixelSprite, PixelTextPattern, ResourceKind } from "./model.ts";
 
 export const pixelText: Record<string, PixelTextPattern> = {
@@ -223,21 +224,60 @@ export const resourceSprites: Record<ResourceKind, PixelSprite> = {
   },
 };
 
-export const enemySprite: PixelSprite = {
-  rows: [
-    "..d....d..",
-    ".drd..drd.",
-    ".drrrrrrd.",
-    "drrpddprrd",
-    "drrrrrrrrd",
-    ".drrrrrrd.",
-    "..drrrrd..",
-    ".dd.d..dd.",
-  ],
-  palette: {
-    d: "#330914",
-    r: "#dc2626",
-    p: "#ffd0d8",
+export const enemySprites: Record<EnemyCategoryId, PixelSprite> = {
+  crawler: {
+    rows: [
+      "..d....d..",
+      ".drd..drd.",
+      ".drrrrrrd.",
+      "drrpddprrd",
+      "drrrrrrrrd",
+      ".drrrrrrd.",
+      "..drrrrd..",
+      ".dd.d..dd.",
+    ],
+    palette: {
+      d: "#330914",
+      r: "#dc2626",
+      p: "#ffd0d8",
+    },
+  },
+  spawnling: {
+    rows: [
+      "...d..d...",
+      "..drrrrd..",
+      ".drryyrrd.",
+      "drryddyrrd",
+      ".drrrrrrd.",
+      "..drrrrd..",
+      ".d.d..d.d.",
+      "d........d",
+    ],
+    palette: {
+      d: "#1f2937",
+      r: "#b91c1c",
+      y: "#fbbf24",
+    },
+  },
+  nest: {
+    rows: [
+      "...bbbb...",
+      "..bppppb..",
+      ".bprrrrpb.",
+      "bprddddrpb",
+      "bprdlllrpb",
+      "bprddddrpb",
+      ".bprrrrpb.",
+      "..bppppb..",
+      "...bbbb...",
+    ],
+    palette: {
+      b: "#111827",
+      d: "#3f1d2e",
+      l: "#ff6f86",
+      p: "#7f1d1d",
+      r: "#dc2626",
+    },
   },
 };
 

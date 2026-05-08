@@ -1,4 +1,5 @@
-import type { CarryResourceKind } from "./gameConfig.ts";
+import type { CarryResourceKind, EnemyCategoryId } from "./gameConfig.ts";
+export type { BiomeKind } from "./gameConfig.ts";
 
 export type Vec3 = {
   x: number;
@@ -7,7 +8,6 @@ export type Vec3 = {
 };
 
 export type ResourceKind = CarryResourceKind | "shop" | "save";
-export type BiomeKind = "sea" | "green" | "desert" | "radioactive";
 
 export type Resource = {
   n: number;
@@ -24,8 +24,13 @@ export type ProjectedResource = Resource & {
 
 export type Enemy = {
   id: number;
+  categoryId: EnemyCategoryId;
   pos: Vec3;
   size: number;
+  spawnTimer: number;
+  exploreTimer: number;
+  exploreTarget?: Vec3;
+  spawnedById?: number;
 };
 
 export type Shot = {

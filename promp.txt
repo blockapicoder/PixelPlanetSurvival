@@ -11,13 +11,14 @@ Stack technique:
   - `src/main.ts` pour le jeu.
   - `src/styles.css` pour le plein ecran.
   - `src/gameConfig.ts` pour tous les parametres modifiables du jeu.
+  - `src/gameConfig.ts` doit exporter un type `GameConfig` qui decrit toute la structure de configuration.
   - `src/model.ts` pour toutes les declarations de types et interfaces.
   - `src/sprite.ts` pour tous les sprites pixel art et la police pixel.
 
 Contraintes de configuration:
 Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts`, notamment:
 - ressources initiales du joueur: vie, energie, or.
-- intervalle periodique de perte de vie.
+- intervalle periodique de perte de vie par biome.
 - capacites initiales de transport pour vie, energie et or.
 - taille de la sphere.
 - zoom, vitesse, pas de deplacement, vitesse de rotation.
@@ -25,12 +26,15 @@ Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts
 - distance minimale entre ressources.
 - distance de collecte.
 - couleurs et repartitions de ressources par biome.
+- intervalle de perte de vie par biome pour faire varier la survie selon la zone.
 - nombre de magasins.
 - distance d'ouverture des magasins.
 - nombre de points de sauvegarde.
 - distance d'activation des points de sauvegarde.
 - cout en energie pour confirmer une sauvegarde.
 - nombre d'ennemis.
+- categories d'ennemis: `enemies` doit etre une structure typee explicitement, avec au depart `{ crawler: EnemyConfig }`.
+- chaque configuration d'ennemi doit declarer les biomes interdits a traverser.
 - distances d'agression et de collision des ennemis.
 - vitesse des ennemis.
 - duree de l'explosion joueur, duree de reduction/restauration de la zone visible et echelle minimale de visibilite pendant la restauration.
@@ -104,6 +108,15 @@ Magasins:
 
 Ennemis:
 - Generer des ennemis sur la sphere.
+- Chaque ennemi doit avoir un identifiant de categorie configurable.
+- Tous les ennemis doivent appartenir a une categorie.
+- Au depart, la configuration contient une seule categorie d'ennemi: `crawler`.
+- Chaque categorie d'ennemi doit avoir son propre sprite pixel art distinct.
+- Les ennemis ne peuvent pas apparaitre sur les biomes interdits par leur categorie et ne peuvent pas les traverser; pour `crawler`, le biome `sea` est interdit.
+- Ajouter une categorie d'ennemi `nest`: un nid immobile qui ne se deplace pas, mais qui produit periodiquement des ennemis mobiles sur la sphere.
+- Ajouter une categorie d'ennemi mobile distincte produite par les nids, avec son propre sprite, sa propre vitesse et ses propres biomes interdits.
+- Les ennemis mobiles produits par les nids doivent explorer la sphere lorsqu'ils ne poursuivent pas le joueur: ils choisissent periodiquement une cible de deplacement valide et changent de cible s'ils sont bloques par un biome interdit.
+- La configuration du nid doit definir cette categorie produite, l'intervalle de production, la distance d'apparition et le nombre maximal d'enfants actifs par nid.
 - Les ennemis sont en pixel art sur la sphere.
 - Au debut, les ennemis ne foncent vers le joueur que quand il est trop proche.
 - Quand un ennemi touche le joueur, le joueur perd un coeur.
@@ -115,6 +128,7 @@ Ennemis:
 
 Vie periodique:
 - Ajouter un compteur qui descend avec le temps et informe le joueur quand il va perdre une vie.
+- La duree du compteur depend du biome sur lequel se trouve le joueur.
 - Quand ce compteur arrive a zero, retirer un coeur au joueur, puis remettre le compteur au maximum.
 - La perte periodique d'un coeur ne recharge pas la sauvegarde tant qu'il reste de la vie.
 - La sauvegarde ne doit etre reprise que lorsque la vie tombe a zero.
@@ -122,10 +136,12 @@ Vie periodique:
 - Afficher ce compteur dans le HUD.
 
 HUD:
-- Afficher un HUD en pixel art a droite de l'ecran.
-- Pour chaque ressource vie, energie, or, afficher:
+- Afficher l'inventaire des ressources en pixel art a gauche de l'ecran.
+- Pour chaque ressource vie, energie, or, l'inventaire doit afficher:
   - quantite actuelle/collectee.
   - capacite maximale.
+- Afficher un HUD en pixel art a droite de l'ecran pour les informations de suivi.
+- Pour chaque ressource vie, energie, or, le HUD de droite doit afficher:
   - quantite restante sur la sphere.
 - Afficher aussi le nombre d'ennemis restants.
 - Afficher la portee actuelle du radar `distRadar`.
