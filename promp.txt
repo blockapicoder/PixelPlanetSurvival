@@ -2,6 +2,7 @@ Creer une application web de jeu appelee "PixelPlanetSurvival" dans un projet Ty
 
 Objectif general:
 Construire un jeu 2D en canvas, en pixel art, ou le joueur pilote un personnage insecte sympathique qui navigue sur la projection d'une sphere. Le jeu doit etre plein ecran, sans interface HTML laterale, avec tous les elements visuels rendus dans le canvas.
+Le point de depart contient un grand vaisseau pixel art, trois fois plus gros qu'un sprite normal. Le but final est de recuperer toutes les pieces du vaisseau dispersees sur la planete et d'eliminer tous les ennemis.
 
 Stack technique:
 - TypeScript strict.
@@ -32,6 +33,10 @@ Tous les parametres de gameplay doivent etre centralises dans `src/gameConfig.ts
 - nombre de points de sauvegarde.
 - distance d'activation des points de sauvegarde.
 - cout en energie pour confirmer une sauvegarde.
+- augmentation du cout en energie apres chaque sauvegarde confirmee.
+- nombre de pieces de vaisseau a recuperer.
+- taille du vaisseau de depart.
+- distance de collecte des pieces de vaisseau.
 - nombre d'ennemis.
 - categories d'ennemis: `enemies` doit etre une structure typee explicitement, avec au depart `{ crawler: EnemyConfig }`.
 - chaque configuration d'ennemi doit declarer les biomes interdits a traverser.
@@ -78,7 +83,11 @@ Ressources:
   - or: argent.
   - magasin: ouvre une boutique.
   - sauvegarde: balise/checkpoint en pixel art qui definit le point de retour du joueur.
+  - piece de vaisseau: item de mission a collecter pour reparer le vaisseau.
 - Chaque ressource doit etre dessinee en pixel art dans le canvas.
+- Le vaisseau de depart doit etre dessine au point de depart du joueur sur la surface de la sphere.
+- Generer plusieurs pieces du vaisseau sur la planete, separees des autres ressources.
+- Les pieces de vaisseau collecteables disparaissent quand elles sont ramassees et augmentent le compteur de progression.
 - Les ressources collecteables disparaissent quand elles sont ramassees.
 - Le joueur ne peut pas ramasser une ressource si la capacite correspondante est pleine.
 - Les coeurs augmentent la vie jusqu'a la capacite de vie.
@@ -87,6 +96,7 @@ Ressources:
 - L'or augmente l'argent jusqu'a la capacite d'or.
 - Quand le joueur passe sur une sauvegarde, afficher une popup pixel art demandant s'il veut sauvegarder.
 - La sauvegarde est payante et consomme de l'energie.
+- Le cout de sauvegarde augmente apres chaque sauvegarde confirmee selon un parametre de configuration.
 - La popup de sauvegarde doit afficher le cout en energie.
 - Si le joueur confirme la popup et a assez d'energie, consommer l'energie, puis cette position devient le point de retour du joueur et l'etat acquis a ce moment est memorise: ressources, capacites et ameliorations.
 - Si le joueur n'a pas assez d'energie, afficher un message indiquant qu'il n'a pas assez d'energie pour sauvegarder et garder la popup ouverte.
@@ -101,8 +111,9 @@ Magasins:
   - augmentation de capacite d'energie.
   - augmentation de capacite d'or.
   - augmentation de portee du radar `distRadar`.
+  - augmentation de vitesse du joueur.
 - Les achats coutent de l'or.
-- Les couts et les gains de capacite doivent etre configurables dans `src/gameConfig.ts`.
+- Les couts et les gains de capacite, radar et vitesse doivent etre configurables dans `src/gameConfig.ts`.
 - La boutique doit pouvoir etre fermee avec un bouton dans l'interface ou avec `Escape`.
 - Apres fermeture, le magasin ne doit pas se rouvrir en boucle tant que le joueur n'est pas sorti de sa zone.
 
@@ -117,6 +128,17 @@ Ennemis:
 - Ajouter une categorie d'ennemi mobile distincte produite par les nids, avec son propre sprite, sa propre vitesse et ses propres biomes interdits.
 - Les ennemis mobiles produits par les nids doivent explorer la sphere lorsqu'ils ne poursuivent pas le joueur: ils choisissent periodiquement une cible de deplacement valide et changent de cible s'ils sont bloques par un biome interdit.
 - La configuration du nid doit definir cette categorie produite, l'intervalle de production, la distance d'apparition et le nombre maximal d'enfants actifs par nid.
+- Ajouter une categorie d'ennemi `turret`: une tourelle immobile qui tire periodiquement vers le joueur quand il est a portee.
+- Les tourelles ne doivent pas detruire le joueur par collision directe; elles sont dangereuses par leurs projectiles.
+- Les tourelles doivent se tourner visuellement vers le joueur quand elles le visent.
+- Afficher autour de chaque tourelle un cercle de portee d'attaque pour indiquer si le joueur est dans son champ de tir.
+- Afficher aussi autour des `crawler` un cercle de detection base sur leur distance d'agression.
+- Les cercles de portee doivent etre projetes sur la surface de la sphere, rester visibles quand le joueur est hors zone, et devenir plus marques quand il entre dans le champ.
+- Les tourelles doivent etre pretes a tirer des que le joueur entre dans leur portee.
+- Les ennemis situes sur la face arriere de la sphere ne doivent pas etre dessines comme s'ils etaient actifs sur la face visible.
+- Les projectiles de tourelle ont leur propre vitesse, duree de vie et distance d'impact configurables.
+- Un impact de projectile de tourelle est lethal: il retire tous les coeurs et declenche la restauration du joueur.
+- Les projectiles de tourelle doivent etre gros, lumineux et tres lisibles en pixel art.
 - Les ennemis sont en pixel art sur la sphere.
 - Au debut, les ennemis ne foncent vers le joueur que quand il est trop proche.
 - Quand un ennemi touche le joueur, le joueur perd un coeur.
@@ -136,16 +158,26 @@ Vie periodique:
 - Afficher ce compteur dans le HUD.
 
 HUD:
+- Ajouter un bouton `AIDE` / `HELP` dans le canvas.
+- L'aide doit ouvrir une fenetre en jeu qui documente les items, ressources et ennemis: sauvegarde, ennemis, tourelle, coeur, or, energie, nid, magasin, piece de vaisseau et vaisseau de depart.
+- L'aide doit proposer une option de langue francais / anglais.
+- Quand l'aide est ouverte, le gameplay actif doit etre en pause et `Escape` doit fermer la fenetre.
 - Afficher l'inventaire des ressources en pixel art a gauche de l'ecran.
-- Pour chaque ressource vie, energie, or, l'inventaire doit afficher:
+- Dans l'inventaire, la vie doit etre affichee sous forme de barre segmentee plutot qu'un nombre de coeurs.
+- La barre de vie doit grandir quand la capacite de vie augmente via les achats.
+- Pour energie et or, l'inventaire doit afficher:
   - quantite actuelle/collectee.
   - capacite maximale.
+- L'inventaire doit afficher l'upgrade de vitesse du joueur et la valeur de vitesse actuelle.
+- L'inventaire doit afficher le nombre de pieces de vaisseau transportees qui restent a rapporter au vaisseau.
 - Afficher un HUD en pixel art a droite de l'ecran pour les informations de suivi.
 - Pour chaque ressource vie, energie, or, le HUD de droite doit afficher:
   - quantite restante sur la sphere.
 - Afficher aussi le nombre d'ennemis restants.
+- Afficher la progression des pieces de vaisseau recuperees.
 - Afficher la portee actuelle du radar `distRadar`.
-- Afficher le compteur avant perte de vie periodique.
+- Afficher le compteur avant perte de vie periodique sous forme de barre `VIE DANS`.
+- Afficher un ecran de victoire quand toutes les pieces de vaisseau sont recuperees et que tous les ennemis sont elimines.
 
 Radar:
 - Ajouter un radar autour de la bordure de la sphere.
@@ -157,8 +189,38 @@ Radar:
   - une valeur superieure signifie que l'objet est plus loin hors de la bordure visible.
 - Le radar doit pouvoir signaler les ressources, les magasins et les ennemis avec des couleurs distinctes.
 - Sur le radar, les ennemis doivent etre representes par une petite tete de mort en pixel art.
+- Les ennemis gardent tous une tete de mort sur le radar, mais leur detection doit pouvoir etre activee/desactivee par type d'ennemi: crawler, spawnling, nid et tourelle.
+- Le vaisseau d'origine doit apparaitre sur le radar avec son propre indicateur et pouvoir etre active/desactive dans les options radar.
 - La portee du radar doit pouvoir etre augmentee dans le magasin contre de l'or.
 - Ajouter a gauche de l'ecran un panneau pixel art permettant d'activer ou desactiver les blips radar par type d'objet: vie, energie, or, magasin, sauvegarde, ennemi.
+- Le panneau d'options radar doit etre replie par defaut et s'ouvrir via un bouton `RADAR` place a cote du bouton `AIDE`.
+- La liste des options radar doit etre generee automatiquement depuis les types d'objets filtrables, avec un panneau plus large qui adapte sa hauteur au nombre d'items.
+- Le panneau radar doit proposer un bouton `TOUS OFF` pour desactiver tous les indicateurs radar en une seule action.
+
+Vaisseau et pieces:
+- Le point de depart du joueur est un vaisseau en pixel art plus grand que le personnage.
+- Des pieces de vaisseau sont dispersees sur la planete.
+- Quand le joueur collecte une piece de vaisseau, afficher une petite animation de recuperation.
+- Les pieces collectees doivent etre rapportees au vaisseau pour etre installees.
+- Quand le joueur revient au vaisseau avec une piece, jouer une animation d'installation sur le vaisseau.
+- Afficher le tableau de plan technique du vaisseau uniquement quand le joueur arrive pres du vaisseau, pour ne pas encombrer l'ecran.
+- Le tableau technique montre les pieces installees, les pieces transportees et les emplacements manquants.
+- Meme quand aucune piece n'est collectee, le tableau technique doit montrer les elements manquants quand le joueur est pres du vaisseau.
+- La victoire demande de reparer le vaisseau avec toutes les pieces et d'eliminer tous les ennemis.
+
+Armes:
+- Le joueur possede une arme de tir manuel qui consomme de l'energie.
+- Ajouter une arme automatique optionnelle: un detecteur d'ennemis.
+- Le detecteur doit pouvoir etre active ou desactive depuis un menu `ARME`.
+- Quand il est active, le detecteur cherche automatiquement les ennemis dans son rayon d'action.
+- Si un ennemi est detecte dans le rayon, le detecteur declenche une explosion qui detruit les ennemis proches.
+- Apres son declenchement, le detecteur reste actif pendant une duree configurable; tout ennemi qui entre dans le rayon pendant cette duree est detruit aussi sans relancer un cout d'energie.
+- Le detecteur doit tenir compte de la taille des ennemis et intercepter un ennemi pendant son deplacement avant qu'il puisse toucher le joueur.
+- Chaque declenchement consomme de l'energie proportionnellement au rayon d'action.
+- Le cout en energie du champ protecteur augmente aussi a chaque ennemi detruit par le detecteur, selon un parametre configurable.
+- Si l'energie est insuffisante, le detecteur se desactive automatiquement.
+- Le rayon d'action du detecteur doit pouvoir etre ameliore dans le magasin contre de l'or.
+- Tous les parametres du detecteur doivent etre dans `gameConfig.ts`: rayon initial, gain de rayon, cout d'amelioration, cout d'energie proportionnel, augmentation du cout par ennemi detruit, duree active, delai entre explosions et duree d'explosion.
 
 Rendu:
 - Tout doit etre dessine dans le canvas.

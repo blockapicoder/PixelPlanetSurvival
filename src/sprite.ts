@@ -21,6 +21,8 @@ export const pixelText: Record<string, PixelTextPattern> = {
   G: ["111", "100", "101", "101", "111"],
   H: ["101", "101", "111", "101", "101"],
   I: ["111", "010", "010", "010", "111"],
+  J: ["111", "001", "001", "101", "111"],
+  K: ["101", "101", "110", "101", "101"],
   L: ["100", "100", "100", "100", "111"],
   M: ["101", "111", "111", "101", "101"],
   O: ["111", "101", "101", "101", "111"],
@@ -31,8 +33,10 @@ export const pixelText: Record<string, PixelTextPattern> = {
   T: ["111", "010", "010", "010", "010"],
   U: ["101", "101", "101", "101", "111"],
   V: ["101", "101", "101", "101", "010"],
+  W: ["101", "101", "111", "111", "101"],
   X: ["101", "101", "010", "101", "101"],
   Y: ["101", "101", "010", "010", "010"],
+  Z: ["111", "001", "010", "100", "111"],
   " ": ["000", "000", "000", "000", "000"],
 };
 
@@ -222,6 +226,47 @@ export const resourceSprites: Record<ResourceKind, PixelSprite> = {
       g: "#2dd4bf",
     },
   },
+  shipPart: {
+    rows: [
+      "..bbbb..",
+      ".bccccb.",
+      "bccwwccb",
+      "bcwyywcb",
+      "bccwwccb",
+      ".bccccb.",
+      "..bbbb..",
+    ],
+    palette: {
+      b: "#111827",
+      c: "#9ca3af",
+      w: "#d7f3ff",
+      y: "#facc15",
+    },
+  },
+};
+
+export const baseShipSprite: PixelSprite = {
+  rows: [
+    "......b......",
+    ".....bwb.....",
+    "....bwwwb....",
+    "...bwwcwwb...",
+    "..bwwcccwwb..",
+    ".bwwcccccwwb.",
+    "bwwccfffccwwb",
+    "bbbccfffccbbb",
+    "...bwwwwwb...",
+    "..bwwb.bwwb..",
+    ".brrb...brrb.",
+    "brrb.....brrb",
+  ],
+  palette: {
+    b: "#111827",
+    c: "#5dd7d2",
+    f: "#9ca3af",
+    r: "#ff6f61",
+    w: "#d7f3ff",
+  },
 };
 
 export const enemySprites: Record<EnemyCategoryId, PixelSprite> = {
@@ -277,6 +322,25 @@ export const enemySprites: Record<EnemyCategoryId, PixelSprite> = {
       l: "#ff6f86",
       p: "#7f1d1d",
       r: "#dc2626",
+    },
+  },
+  turret: {
+    rows: [
+      "...bbbb...",
+      "..bccccb..",
+      ".bcddddcb.",
+      "bcddyyddcb",
+      "bcdybbdycb",
+      "bcddyyddcb",
+      ".bcddddcb.",
+      "..bccccb..",
+      "...bbbb...",
+    ],
+    palette: {
+      b: "#111827",
+      c: "#4b5563",
+      d: "#7c2d12",
+      y: "#facc15",
     },
   },
 };

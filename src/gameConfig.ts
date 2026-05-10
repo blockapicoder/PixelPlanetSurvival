@@ -19,6 +19,14 @@ export type EnemyExploreConfig = {
   retargetFrames: number;
   targetDistance: number;
 };
+export type EnemyShootConfig = {
+  range: number;
+  intervalFrames: number;
+  moveDistance: number;
+  hitDistance: number;
+  lifeFrames: number;
+  projectileSize: number;
+};
 export type EnemyConfig<TSpawnCategory extends string = string> = {
   count: number;
   size: number;
@@ -29,12 +37,14 @@ export type EnemyConfig<TSpawnCategory extends string = string> = {
   moveDistance: number;
   blockedBiomes: BiomeKind[];
   explore?: EnemyExploreConfig;
+  shoot?: EnemyShootConfig;
   spawn?: EnemySpawnConfig<TSpawnCategory>;
 };
 export type EnemiesConfig = {
   crawler: EnemyConfig;
   spawnling: EnemyConfig;
   nest: EnemyConfig<"spawnling">;
+  turret: EnemyConfig;
 };
 export type CapacityUpgradeConfig = {
   capacityStep: number;
@@ -46,10 +56,30 @@ export type RadarUpgradeConfig = {
   baseCost: number;
   costStep: number;
 };
+
+export type SpeedUpgradeConfig = {
+  speedStep: number;
+  maxSpeed: number;
+  baseCost: number;
+  costStep: number;
+};
+
+export type EnemyDetectorConfig = {
+  initialRange: number;
+  rangeStep: number;
+  baseCost: number;
+  costStep: number;
+  energyCostPerRange: number;
+  energyCostPerKill: number;
+  activeFrames: number;
+  cooldownFrames: number;
+  explosionTtl: number;
+};
 export type GameConfig = {
   player: {
     initialResources: ResourceAmounts;
     initialCapacity: ResourceAmounts;
+    projectileHitInvulnerabilityFrames: number;
   };
   world: {
     zoom: number;
@@ -72,6 +102,14 @@ export type GameConfig = {
     count: number;
     activationDistance: number;
     energyCost: number;
+    energyCostStep: number;
+  };
+  mission: {
+    shipPartCount: number;
+    baseShipSize: number;
+    shipPartCollectionDistance: number;
+    baseRepairDistance: number;
+    shipPartInstallFrames: number;
   };
   radar: {
     initialRange: number;
@@ -98,14 +136,16 @@ export type GameConfig = {
   };
   shopUpgrades: Record<CarryResourceKind, CapacityUpgradeConfig> & {
     radar: RadarUpgradeConfig;
+    speed: SpeedUpgradeConfig;
   };
+  enemyDetector: EnemyDetectorConfig;
 };
 
 export const gameConfig = {
   player: {
     initialResources: {
       life: 5,
-      energy: 8,
+      energy: 5,
       gold: 0,
     },
     initialCapacity: {
@@ -113,6 +153,7 @@ export const gameConfig = {
       energy: 5,
       gold: 10,
     },
+    projectileHitInvulnerabilityFrames: 70,
   },
   world: {
     zoom: 2,
@@ -180,9 +221,17 @@ export const gameConfig = {
     count: 5,
     activationDistance: 3,
     energyCost: 2,
+    energyCostStep: 1,
+  },
+  mission: {
+    shipPartCount: 7,
+    baseShipSize: 3,
+    shipPartCollectionDistance: 3,
+    baseRepairDistance: 4.2,
+    shipPartInstallFrames: 52,
   },
   radar: {
-    initialRange: 18,
+    initialRange: 1,
     maxBlips: 36,
     visionMargin: 86,
   },
@@ -227,6 +276,24 @@ export const gameConfig = {
         maxChildren: 4,
       },
     },
+    turret: {
+      count: 8,
+      size: 1.25,
+      sizeVariance: 0.18,
+      canMove: false,
+      aggroDistance: 0,
+      hitDistance: 2.6,
+      moveDistance: 0,
+      blockedBiomes: ["sea"],
+      shoot: {
+        range: 36,
+        intervalFrames: 165,
+        moveDistance: 2.8,
+        hitDistance: 1.8,
+        lifeFrames: 62,
+        projectileSize: 18,
+      },
+    },
   },
   restore: {
     collapseFrames: 38,
@@ -266,6 +333,23 @@ export const gameConfig = {
       baseCost: 12,
       costStep: 8,
     },
+    speed: {
+      speedStep: 0.12,
+      maxSpeed: 2.2,
+      baseCost: 9,
+      costStep: 7,
+    },
+  },
+  enemyDetector: {
+    initialRange: 8,
+    rangeStep: 5,
+    baseCost: 14,
+    costStep: 10,
+    energyCostPerRange: 0.18,
+    energyCostPerKill: 1,
+    activeFrames: 64,
+    cooldownFrames: 150,
+    explosionTtl: 26,
   },
 } as const satisfies GameConfig;
 
